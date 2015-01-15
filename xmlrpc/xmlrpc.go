@@ -9,14 +9,15 @@ import (
 	"log"
 	"net/http"
 	// "strings"
-	// "fmt"
+	"fmt"
 	"regexp"
 )
 
 func handleMtSupporteMethods(body string, w http.ResponseWriter) bool {
 	matched, _ := regexp.MatchString("mt\\.supportedMethods", body)
 	if matched {
-		io.WriteString(w, "get supported methods")
+		io.WriteString(w, "<?xml version=\"1.0\"?><methodResponse><params><param><value><array><data><value><string>metaWeblog.getRecentPosts</string></value><value><string>metaWeblog.newPost</string></value></data></array></value></param></params></methodResponse>")
+	fmt.Println("Responded to mt.supportedMethods");
 	}
 	return matched
 }
@@ -24,15 +25,19 @@ func handleMtSupporteMethods(body string, w http.ResponseWriter) bool {
 func handleMetaWeblogGetRecentPosts(body string, w http.ResponseWriter) bool {
 	matched, _ := regexp.MatchString("metaWeblog\\.getRecentPosts", body)
 	if matched {
-		io.WriteString(w, "get recent posts")
+		io.WriteString(w, "<?xml version=\"1.0\"?><methodResponse><params><param><value><array><data/></array></value></param></params></methodResponse>")
+		fmt.Println("Responded to get recent posts");
 	}
 	return matched
 }
 
 func handleMetaWeblogNewPost(body string, w http.ResponseWriter) bool {
 	matched, _ := regexp.MatchString("metaWeblog\\.newPost", body)
+
 	if matched {
-		io.WriteString(w, "proxying to webhook!")
+		fmt.Println(body)
+		io.WriteString(w, "I don't handle you yet!")
+		fmt.Println("Got new post message");
 	}
 	return matched
 }
@@ -51,16 +56,18 @@ func main() {
 			} else if handleMetaWeblogNewPost(buf, w) {
 				return
 			} else {
+				fmt.Println("Not a known method call %s", buf);
 				// return error
-				io.WriteString(w, "Error - method not found!")
+				io.WriteString(w, "<?xml version=\"1.0\"?><methodResponse><fault><value><struct><member><name>faultCode</name><value><int>-32601</int></value></member><member><name>faultString</name><value><string>server error. requested method not found</string></value></member></struct></value></fault></methodResponse>")
 			}
 		} else {
-			io.WriteString(w, err.Error())
+			fmt.Println(err);
+			io.WriteString(w, "<?xml version=\"1.0\"?><methodResponse><fault><value><struct><member><name>faultCode</name><value><int>-32601</int></value></member><member><name>faultString</name><value><string>server error. requested method not found</string></value></member></struct></value></fault></methodResponse>")
 		}
 	}
 
 	http.HandleFunc("/xmlrpc.php", handleRequests)
 
-	log.Println("Starting XML-RPC server on localhost:1234/xmlrpc.php")
-	log.Fatal(http.ListenAndServe(":1234", nil))
+	log.Println("Starting XML-RPC server on localhost:80/xmlrpc.php")
+	log.Fatal(http.ListenAndServe(":80", nil))
 }
