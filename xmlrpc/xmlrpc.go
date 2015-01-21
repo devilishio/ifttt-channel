@@ -4,16 +4,41 @@ import (
 	"bytes"
 	// "github.com/divan/gorilla-xmlrpc/xml"
 	// "github.com/gorilla/rpc"
+	"encoding/xml"
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	// "strings"
-	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
+
+type request struct {
+	Params []param `xml:"params>param"`
+}
+
+type param struct {
+	Value value `xml:"value"`
+}
+
+type value struct {
+	Array  []value  `xml:"array>data>value"`
+	Struct []member `xml:"struct>member"`
+	String string   `xml:"string"`
+}
+
+type member struct {
+	Name  string `xml:"name"`
+	Value value  `xml:"value"`
+}
+
+type webhookRequest struct {
+	url string
+}
 
 func handleMtSupporteMethods(body string, w http.ResponseWriter) bool {
 	matched, _ := regexp.MatchString("mt\\.supportedMethods", body)
@@ -37,9 +62,46 @@ func handleMetaWeblogNewPost(body string, w http.ResponseWriter) bool {
 	if matched {
 		id := strconv.FormatInt(time.Now().Unix(), 10)
 		response := "<?xml version=\"1.0\"?><methodResponse><params><param><value><string>" + id + "</string></value></param></params></methodResponse>"
+
+		// Parse the body and forward on the contents to the URL requested
+		forwardRequest(body)
+
 		io.WriteString(w, response)
 	}
 	return matched
+}
+
+func forwardRequest(body string) {
+	request, err := parseWebhookRequest(body)
+	if err != nil {
+		fmt.Println(err.Error())
+	} else {
+		fmt.Println(request)
+	}
+}
+
+func parseWebhookRequest(rawXml string) (webhookRequest, error) {
+	var req request
+
+	decoder := xml.NewDecoder(strings.NewReader(rawXml))
+	err := decoder.Decode(&req)
+	if err != nil {
+		fmt.Println(err.Error())
+		return webhookRequest{}, err
+	} else {
+		username := req.Params[1].Value.String
+		password := req.Params[2].Value.String
+		fmt.Printf("Username: %s, Password: %s\n", username, password)
+		for _, mem := range req.Params[3].Value.Struct {
+			name := mem.Name
+			if name == "description" {
+				desc := mem.Value.String
+				fmt.Printf("Description: %s\n", desc)
+				return webhookRequest{url: strings.TrimSpace(desc)}, nil
+			}
+		}
+		return webhookRequest{}, errors.New("No description found to parse")
+	}
 }
 
 // Entry point for server
