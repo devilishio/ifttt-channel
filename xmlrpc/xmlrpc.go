@@ -77,6 +77,12 @@ func forwardRequest(body string) {
 		fmt.Println(err.Error())
 	} else {
 		fmt.Println(request)
+		res, err := http.Get(request.url)
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			fmt.Printf("Sent GET request to %s\n", request.url)
+		}
 	}
 }
 
@@ -98,6 +104,8 @@ func parseWebhookRequest(rawXml string) (webhookRequest, error) {
 				desc := mem.Value.String
 				fmt.Printf("Description: %s\n", desc)
 				return webhookRequest{url: strings.TrimSpace(desc)}, nil
+			} else if name == "title" {
+				fmt.Printf("Title: %s\n", mem.Value.String)
 			}
 		}
 		return webhookRequest{}, errors.New("No description found to parse")
